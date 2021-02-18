@@ -32,8 +32,11 @@ feed_dict = {
 
 session = Session()
 
+losses = []
+
 for epoch in range(10):
     loss = session.run(root_op=loss, feed_dict=feed_dict)
+    losses.append(loss.numpy)
     optimizer.minimize(loss)
     print(f"\033[32m[Epoch:{epoch}]\033[0m loss:{loss.numpy}")
 
@@ -44,8 +47,16 @@ x = np.arange(-4, 4, 0.1)
 y = -W_weight[0][0] / W_weight[1][0] * x - b_weight[0][0] / W_weight[1][0]
 
 
-plt.style.use("seaborn")
+plt.style.use(['dark_background'])
+plt.subplot(1, 2, 1)
+plt.plot(losses, "-o")
+plt.ylabel("loss")
+plt.xlabel("#iteration")
+
+plt.subplot(1, 2, 2)
 plt.scatter(red_points[:, 0], red_points[:, 1], color="red")
 plt.scatter(blue_points[:, 0], blue_points[:, 1], color="blue")
 plt.plot(x, y)
+plt.xlabel("$X_1$")
+plt.ylabel("$X_2$")
 plt.show()
