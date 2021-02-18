@@ -4,6 +4,7 @@
 import numpy as np
 from queue import Queue
 from typing import Union
+import sys
 
 _default_graph = None
 
@@ -17,65 +18,68 @@ class Graph(object):  # our calculate graph
         global _default_graph
         _default_graph = self
 
+class Node(object):
+    def __init__(self):
+        self.output = None          # output is the current value of the node
+        self.consumers = []         # consumers log all the node that uses this operation
 
-class Operation(object):  # operation object, it will generate all the operation object 
+    def __add__(self, x):
+        return add(self, x)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}({str(self.output)})"
+    
+    @property
+    def numpy(self):
+        if self.output is None:
+            raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
+        return np.array(self.output)
+    
+    @property
+    def shape(self):
+        if self.output is None:
+            raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
+        return np.array(self.output).shape
+    
+    def to_numpy(self):
+        if self.output is None:
+            raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
+        return np.array(self.output)
+
+    def to_list(self):
+        if self.output is None:
+            raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
+        return list(self.output)
+
+
+class Operation(Node):  # operation object, it will generate all the operation object 
     def __init__(self, input_nodes : list = []):
+        super().__init__()
         self.input_nodes = input_nodes
-        self.consumers = []  # consumers log all the node that uses this operation
-        self.output = None  
         for node in input_nodes:  # input nodes also have a consumers
             node.consumers.append(self)
 
         # add to global graph
         _default_graph.operations.append(self)
-    
-    def __add__(self, x):
-        return add(self, x)
-    
-    def __str__(self):
-        return f"Operation({str(self.output)})"
-    
-    def numpy(self):
-        return np.array(self.output)
 
     def compute(self):  # work as a virtual function
         pass
 
 
-class Placeholder(object):
+class Placeholder(Node):
     def __init__(self):
-        self.consumers = []
-        self.output = None
+        super().__init__()
         # add to global graph
         _default_graph.Placeholders.append(self)
-    
-    def __add__(self, x):
-        return add(self, x)
 
-    def __str__(self):
-        return f"Placeholder({str(self.output)})"
-    
-    def numpy(self):
-        return np.array(self.output)
-
-class Variable(object):
+class Variable(Node):
     def __init__(self, initial_value=None):
+        super().__init__()
         if not isinstance(initial_value, np.ndarray):
             initial_value = np.array(initial_value)
         self.value = initial_value
-        self.consumers = []
-        self.output = None
         # add to global graph
         _default_graph.variables.append(self)
-    
-    def __add__(self, x):
-        return add(self, x)
-    
-    def __str__(self):
-        return f"Variable({str(self.output)})"
-    
-    def numpy(self):
-        return np.array(self.output)
 
 
 class add(Operation):
@@ -161,6 +165,27 @@ class softmax(Operation):
         reduce_shape = list(np.array(x_value).shape)
         reduce_shape[self.axis] = 1
         return np.exp(x_value) / np.sum(np.exp(x_value), axis=self.axis).reshape(reduce_shape)   # reshape for boardcast
+
+# loss function
+def cross_entropy(predict : Union[Placeholder, Variable, Operation], label : Union[Placeholder, Variable, Operation], one_hot : bool = True):
+    """
+        predict: predict value of net, can be the result of softmax
+        label: label, can be index or one hot vector
+        one_hot: if True, do one hot encoding to label
+    """
+    # TODO : solve 
+    # if one_hot:
+    #     indexes = label.numpy.reshape(-1)
+    #     one_hot_vectors = np.zeros(shape=predict.shape)
+    #     one_hot_vectors[indexes] = 1
+    #     for i, _ in enumerate(one_hot_vectors):
+    #         one_hot_vectors[i][indexes[i]] = 1
+    #     label.output = one_hot_vectors
+
+    # if label.shape != predict.shape:
+    #     raise ValueError(f"In CrossEntropy loss, label must share the same shape with predict, but receive predict.shape={predict.shape}, label.shape={label.shape}")
+    
+    return negative(reduce_sum(reduce_sum(multiply(label, log(predict)), axis=1)))
 
 
 class Session(object):  # Session object calculate the input calculation graph
@@ -262,7 +287,28 @@ class Register(dict):
 _gradient_registry = Register()
 @_gradient_registry("add")     # chain law
 def __add_gradient(consumer : Operation, grad : float):
-    return np.array([grad, grad])
+    shape1 = consumer.input_nodes[0].shape
+    shape2 = consumer.input_nodes[1].shape
+    grad_shape = grad.shape
+
+    # prevent automatic boardcast calculation
+    if shape1 == grad_shape:
+        grad1 = grad
+    else:
+        for axis, _ in enumerate(grad_shape):
+            if grad_shape[axis] != shape1[axis]:
+                break
+        grad1 = grad.mean(axis=axis).reshape(shape1)
+    
+    if shape2 == grad_shape:
+        grad2 = grad
+    else:
+        for axis, _ in enumerate(grad_shape):
+            if grad_shape[axis] != shape2[axis]:
+                break
+        grad2 = grad.mean(axis=axis).reshape(shape2)
+
+    return np.array([grad1, grad2])
 
 @_gradient_registry("negative")
 def __negative_gradient(consumer : Operation, grad : float):          
