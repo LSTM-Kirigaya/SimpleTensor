@@ -1,6 +1,7 @@
 from SimpleTensor.core import Placeholder, Variable
 from SimpleTensor.core import Session
 from SimpleTensor.core import mean_square_error, SGD, Linear
+from SimpleTensor.core import view_graph
 
 from sklearn.datasets import load_boston 
 import matplotlib.pyplot as plt
@@ -55,3 +56,5 @@ plt.show()
 from SimpleTensor.core import _default_graph
 for item in _default_graph:
     print(item.__class__)
+
+view_graph(node=loss, format="pdf")

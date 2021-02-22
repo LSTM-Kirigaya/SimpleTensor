@@ -11,6 +11,7 @@ class add : pass
 class minus : pass
 class negative : pass
 class multiply : pass
+class matmul : pass
 class elementwise_pow : pass
 
 _default_graph = []
@@ -312,7 +313,7 @@ def __softmax_gradient(op_node : Operation, grad : np.ndarray):
 # create session to update nodes' data in the graph
 class Session(object):
     def run(self, root_op : Operation, feed_dict : dict = {}):
-        all_nodes = self.__get_all_nodes(root_op)
+        all_nodes = _default_graph
 
         for node in all_nodes:
             if isinstance(node, Variable):
@@ -324,16 +325,6 @@ class Session(object):
                 node.data = node.compute(*input_datas)
 
         return root_op
-    
-    def __get_all_nodes(self, root):        # get all the nodes before and include "root"
-        all_nodes = []
-        def recurse(node):
-            if isinstance(node, Operation):
-                for n in node.input_nodes:
-                    recurse(n)
-            all_nodes.append(node)
-        recurse(root)
-        return all_nodes
 
 # optimizer
 class Optimizer(object):
@@ -404,5 +395,30 @@ class SGD(Optimizer):   # Stochastic gradient descent
                 
         return grad_table
 
+
+def view_graph(node : Operation, file_name : str = "./dot", format="png"):
+    from graphviz import Digraph
+    dot = Digraph(format=format)
+
+    if not isinstance(node, Operation):
+        raise ValueError("input node must be an Operation!")
+    queue = Queue()
+    queue.put(node)
+    node2id = {}
+    for index, n in enumerate(_default_graph):
+        dot.node(name=str(index), label=str(n.__class__.__name__))
+        node2id[n] = str(index)
+
+    while not queue.empty():
+        cur_node = queue.get()
+        for input_node in cur_node.input_nodes:
+            if isinstance(input_node, Operation):   
+                queue.put(input_node)
+            dot.edge(node2id[input_node], node2id[cur_node])
+
+    dot.render(filename=file_name, cleanup=True)
+
 if __name__ == "__main__":
-    pass
+    X = Placeholder()
+    out = Linear(13, 1, bias=True)(X)
+    view_graph(node=_default_graph[-1], format="pdf")
