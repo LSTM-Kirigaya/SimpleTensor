@@ -14,6 +14,48 @@ class multiply : pass
 class matmul : pass
 class elementwise_pow : pass
 
+class Register(dict):
+    def __init__(self, *args, **kwargs):
+        super(Register, self).__init__(*args, **kwargs)
+        self._dict = {}
+    
+    def register(self, target):
+        def add_register_items(key, value):
+            if not callable(value):
+                raise ValueError(f"register object must be callable, but receive {type(value)}")
+            if key in self._dict:
+                print(f"warning: \033[33m{value.__name__} has been registered before, so we will overriden it\033[0m")
+            self[key] = value
+            return value
+        return add_register_items(target.__name__, target) if callable(target) else lambda x : add_register_items(target, x)
+
+    def __call__(self, *args, **kwargs):
+        return self.register(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        self._dict[key] = value
+    
+    def __getitem__(self, key):
+        return self._dict[key]
+    
+    def __contains__(self, key):
+        return key in self._dict
+    
+    def __str__(self):
+        return f"{str(self._dict)}"
+
+    def keys(self):
+        return self._dict.keys()
+    
+    def values(self):
+        return self._dict.values()
+    
+    def items(self):
+        return self._dict.items()
+
+_register_act_functions = Register()
+_register_grad_functions = Register()
+
 _default_graph = []
 
 class Node(object):
@@ -161,6 +203,43 @@ class sigmoid(Operation):
     def compute(self, x_v : np.ndarray):
         return 1 / (1 + np.exp(-1. * x_v))
 
+class tanh(Operation):
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
+    
+    def compute(self, x_v : np.ndarray):
+        ex = np.exp(x_v)
+        dex = 1. / ex
+        return (ex - dex) / (ex + dex)
+
+class relu(Operation):
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
+    
+    def compute(self, x_v : np.ndarray):
+        x_v[x_v < 0] = 0.
+        return x_v
+
+class leaky_relu(Operation):
+    def __init__(self, x : Node, alpha : float = 1e-2):
+        super().__init__(input_nodes=[x])
+        self.alpha = alpha
+    
+    def compute(self, x_v : np.ndarray):
+        x_v[x_v < 0] *= self.alpha
+        return x_v
+
+class elu(Operation):
+    def __init__(self, x : Node, alpha : float = 1e-2):
+        super().__init__(input_nodes=[x])
+        self.alpha = alpha
+    
+    def compute(self, x_v : np.ndarray):
+        x_v[x_v < 0] = self.alpha * (np.exp(x_v[x_v < 0]) - 1)
+
+
+# TODO : add a class to program the operation which have paramter and can update its self
+
 class softmax(Operation):
     def __init__(self, x : Node, axis : int = None):
         super().__init__(input_nodes=[x])
@@ -190,55 +269,27 @@ def mean_square_error(predict : Node, label : Node, reduction : str = "mean"):
     else:
         raise Exception(f"reduction only receive {__reductions__}")
 
-def Linear(input_dim : int, output_dim : int, bias : bool = True):
-    W = Variable(np.random.randn(input_dim, output_dim))
-    if bias:
-        b = Variable(np.random.randn(1, output_dim))
-        return lambda X : X @ W + b
-    else:
-        return lambda X : X @ W
+
+class Linear(object):
+    def __init__(self, input_dim : int, output_dim : int, bias : bool = True, act : str = None):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.act = act
+        self.W = Variable(np.random.randn(input_dim, output_dim))
+        if bias:
+            self.b = Variable(np.random.randn(1, output_dim))
+    
+    def __call__(self, X : Node):
+        if not isinstance(X, Node):
+            raise ValueError("Linear's parameter X must be a Node!")
+        out = X @ self.W + self.b
+        if self.act:
+            act_func = _register_act_functions[self.act]
+            return act_func(out)
+        else:
+            return out
 
 # register module
-class Register(dict):
-    def __init__(self, *args, **kwargs):
-        super(Register, self).__init__(*args, **kwargs)
-        self._dict = {}
-    
-    def register(self, target):
-        def add_register_items(key, value):
-            if not callable(value):
-                raise ValueError(f"register object must be callable, but receive {type(value)}")
-            if key in self._dict:
-                print(f"warning: \033[33m{value.__name__} has been registered before, so we will overriden it\033[0m")
-            self[key] = value
-            return value
-        return add_register_items(target.__name__, target) if callable(target) else lambda x : add_register_items(target, x)
-
-    def __call__(self, *args, **kwargs):
-        return self.register(*args, **kwargs)
-
-    def __setitem__(self, key, value):
-        self._dict[key] = value
-    
-    def __getitem__(self, key):
-        return self._dict[key]
-    
-    def __contains__(self, key):
-        return key in self._dict
-    
-    def __str__(self):
-        return f"{str(self._dict)}"
-
-    def keys(self):
-        return self._dict.keys()
-    
-    def values(self):
-        return self._dict.values()
-    
-    def items(self):
-        return self._dict.items()
-
-_register_grad_functions = Register()
 def __get_grad_by_shape(node : Node, grad : np.ndarray):
         node_shape, grad_shape = node.shape, grad.shape
         if node_shape == grad_shape:
@@ -302,8 +353,36 @@ def __log_gradient(op_node : Operation, grad : np.ndarray):
 @_register_grad_functions("sigmoid")
 def __sigmoid_gradient(op_node : Operation, grad : np.ndarray):
     x = op_node.input_nodes[0].data
-    emx = np.exp(-1. * x)
-    return np.array([emx / ((1 + emx) ** 2) * grad])
+    ex = np.exp(x)
+    return np.array([ex / ((1 + ex) ** 2) * grad])
+
+@_register_grad_functions("tanh")
+def __tanh_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    e2x = np.exp(2. * x)
+    return np.array([4 * e2x / ((1 + e2x) ** 2) * grad])
+
+@_register_grad_functions("relu")
+def __relu_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    y = op_node.data
+    k = y / x
+    return np.array([k * grad])
+
+@_register_grad_functions("leaky_relu")
+def __leaky_relu(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    y = op_node.data
+    k = y / x
+    return np.array([k * grad])
+
+@_register_grad_functions("elu")
+def __elu_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    k = np.array(x)
+    k[k >= 0] = 1.
+    k[k < 0] = op_node.alpha * np.exp(k[k < 0])
+    return np.array([k * grad])
 
 @_register_grad_functions("softmax")
 def __softmax_gradient(op_node : Operation, grad : np.ndarray):
@@ -313,9 +392,7 @@ def __softmax_gradient(op_node : Operation, grad : np.ndarray):
 # create session to update nodes' data in the graph
 class Session(object):
     def run(self, root_op : Operation, feed_dict : dict = {}):
-        all_nodes = _default_graph
-
-        for node in all_nodes:
+        for node in _default_graph:
             if isinstance(node, Variable):
                 node.data = np.array(node.data)
             elif isinstance(node, Placeholder):
@@ -323,7 +400,6 @@ class Session(object):
             else:
                 input_datas = [n.data for n in node.input_nodes]
                 node.data = node.compute(*input_datas)
-
         return root_op
 
 # optimizer
@@ -419,6 +495,4 @@ def view_graph(node : Operation, file_name : str = "./dot", format="png"):
     dot.render(filename=file_name, cleanup=True)
 
 if __name__ == "__main__":
-    X = Placeholder()
-    out = Linear(13, 1, bias=True)(X)
-    view_graph(node=_default_graph[-1], format="pdf")
+    pass
