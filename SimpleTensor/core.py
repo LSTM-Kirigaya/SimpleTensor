@@ -55,8 +55,14 @@ class Register(dict):
 
 _register_act_functions = Register()
 _register_grad_functions = Register()
-
 _default_graph = []
+
+# constant variable
+PRECISE_LOW = 1e-127
+PRECISE_HIGH = 1e128
+EXP_PRECISE_LOW = -292.42
+EXP_RPECISE_HIGH = 294.73
+EXP = lambda x : np.exp(np.clip(x, EXP_PRECISE_LOW, EXP_RPECISE_HIGH))
 
 class Node(object):
     def __init__(self):
@@ -130,6 +136,9 @@ class Variable(Node):
         super().__init__()
         self.data = init_value
 
+"""
+    fundamental function
+"""
 class add(Operation):
     def __init__(self, x : Node, y : Node):
         super().__init__(input_nodes=[x, y])
@@ -196,46 +205,59 @@ class log(Operation):
     def compute(self, x_v : np.ndarray):
         return np.log(x_v)
 
+"""
+    activate function
+"""
+@_register_act_functions("sigmoid")
 class sigmoid(Operation):
     def __init__(self, x : Node):
         super().__init__(input_nodes=[x])
     
     def compute(self, x_v : np.ndarray):
-        return 1 / (1 + np.exp(-1. * x_v))
+        return 1 / (1 + EXP(-1. * x_v))
 
+@_register_act_functions("tanh")
 class tanh(Operation):
     def __init__(self, x : Node):
         super().__init__(input_nodes=[x])
     
     def compute(self, x_v : np.ndarray):
-        ex = np.exp(x_v)
+        # default precise: float32
+        ex = EXP(x_v)
         dex = 1. / ex
         return (ex - dex) / (ex + dex)
 
+@_register_act_functions("relu")
 class relu(Operation):
     def __init__(self, x : Node):
         super().__init__(input_nodes=[x])
     
     def compute(self, x_v : np.ndarray):
-        x_v[x_v < 0] = 0.
-        return x_v
+        y = np.array(x_v)
+        y[y < 0] = 0.
+        return y
 
+@_register_act_functions("leaky_relu")
 class leaky_relu(Operation):
     def __init__(self, x : Node, alpha : float = 1e-2):
         super().__init__(input_nodes=[x])
         self.alpha = alpha
     
     def compute(self, x_v : np.ndarray):
-        x_v[x_v < 0] *= self.alpha
-        return x_v
+        y = np.array(x_v)
+        y[y < 0] *= self.alpha
+        return y
 
+@_register_act_functions("elu")
 class elu(Operation):
     def __init__(self, x : Node, alpha : float = 1e-2):
         super().__init__(input_nodes=[x])
         self.alpha = alpha
     
     def compute(self, x_v : np.ndarray):
-        x_v[x_v < 0] = self.alpha * (np.exp(x_v[x_v < 0]) - 1)
+        y = np.array(x_v)
+        y[y < 0] = self.alpha * (np.exp(y[y < 0]) - 1)
+        return y
 
 
 # TODO : add a class to program the operation which have paramter and can update its self
@@ -274,6 +296,8 @@ class Linear(object):
     def __init__(self, input_dim : int, output_dim : int, bias : bool = True, act : str = None):
         self.input_dim = input_dim
         self.output_dim = output_dim
+        if act and act not in _register_act_functions:
+            raise ValueError(f"input activate function '{act}' is not in registered activate function list:{list(_register_act_functions.keys())}")
         self.act = act
         self.W = Variable(np.random.randn(input_dim, output_dim))
         if bias:
@@ -353,13 +377,13 @@ def __log_gradient(op_node : Operation, grad : np.ndarray):
 @_register_grad_functions("sigmoid")
 def __sigmoid_gradient(op_node : Operation, grad : np.ndarray):
     x = op_node.input_nodes[0].data
-    ex = np.exp(x)
+    ex = EXP(x)
     return np.array([ex / ((1 + ex) ** 2) * grad])
 
 @_register_grad_functions("tanh")
 def __tanh_gradient(op_node : Operation, grad : np.ndarray):
     x = op_node.input_nodes[0].data
-    e2x = np.exp(2. * x)
+    e2x = EXP(2. * x)
     return np.array([4 * e2x / ((1 + e2x) ** 2) * grad])
 
 @_register_grad_functions("relu")
@@ -479,7 +503,9 @@ def view_graph(node : Operation, file_name : str = "./dot", format="png"):
     if not isinstance(node, Operation):
         raise ValueError("input node must be an Operation!")
     queue = Queue()
+    visit = set()
     queue.put(node)
+    visit.add(node)
     node2id = {}
     for index, n in enumerate(_default_graph):
         dot.node(name=str(index), label=str(n.__class__.__name__))
@@ -488,11 +514,13 @@ def view_graph(node : Operation, file_name : str = "./dot", format="png"):
     while not queue.empty():
         cur_node = queue.get()
         for input_node in cur_node.input_nodes:
-            if isinstance(input_node, Operation):   
+            if isinstance(input_node, Operation) and input_node not in visit:   
+                visit.add(input_node)
                 queue.put(input_node)
             dot.edge(node2id[input_node], node2id[cur_node])
 
     dot.render(filename=file_name, cleanup=True)
 
 if __name__ == "__main__":
-    pass
+    for k, v in _register_grad_functions.items():
+        print("{:15}:{}".format(k, v))
