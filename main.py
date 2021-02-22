@@ -1,6 +1,6 @@
 from SimpleTensor.core import Placeholder, Variable
 from SimpleTensor.core import Session
-from SimpleTensor.core import mean_square_error, SGD
+from SimpleTensor.core import mean_square_error, SGD, Linear
 
 from sklearn.datasets import load_boston 
 import matplotlib.pyplot as plt
@@ -19,13 +19,9 @@ test_X, test_Y = X[indexes[offline:]], Y[indexes[offline:]].reshape([-1, 1])
 
 X = Placeholder()
 Y = Placeholder()
-W1 = Variable(np.random.randn(13, 4))
-b1 = Variable(np.random.randn(1, 4))
-W2 = Variable(np.random.randn(4, 1))
-b2 = Variable(np.random.randn(1, 1))
 
-out1 = X @ W1 + b1
-out2 = out1 @ W2 + b2
+out1 = Linear(13, 8)(X)
+out2 = Linear(8, 1)(out1)
 
 loss = mean_square_error(predict=out2, label=Y)
 
@@ -55,3 +51,7 @@ plt.grid(True)
 
 
 plt.show()
+
+from SimpleTensor.core import _default_graph
+for item in _default_graph:
+    print(item.__class__)
