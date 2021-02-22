@@ -1,62 +1,57 @@
-from SimpleTensor.core import Placeholder
-from SimpleTensor.core import Variable
-from SimpleTensor.core import matmul, softmax, log, negative, sigmoid, add, reduce_sum, multiply
-from SimpleTensor.core import cross_entropy
+from SimpleTensor.core import Placeholder, Variable
 from SimpleTensor.core import Session
-from SimpleTensor.core import GradientDescentOptimizer
+from SimpleTensor.core import mean_square_error, SGD
 
+from sklearn.datasets import load_boston 
 import matplotlib.pyplot as plt
 import numpy as np
 
-np.random.seed(120)
-# samples
-red_points = np.random.randn(50, 2) - 2
-blue_points = np.random.randn(50, 2) + 2
+X, Y = load_boston(return_X_y=True)
+
+sample_num = X.shape[0]
+ratio = 0.8
+offline = int(ratio * sample_num)
+indexes = np.arange(sample_num)
+np.random.shuffle(indexes)
+
+train_X, train_Y = X[indexes[:offline]], Y[indexes[:offline]].reshape([-1, 1])
+test_X, test_Y = X[indexes[offline:]], Y[indexes[offline:]].reshape([-1, 1])
 
 X = Placeholder()
-W = Variable(np.random.randn(2, 2))
-b = Variable(np.random.randn(1, 2))
-c = Placeholder()
+Y = Placeholder()
+W1 = Variable(np.random.randn(13, 4))
+b1 = Variable(np.random.randn(1, 4))
+W2 = Variable(np.random.randn(4, 1))
+b2 = Variable(np.random.randn(1, 1))
 
-f = matmul(X, W) + b        # linear layer
-p = softmax(f, axis=1)
+out1 = X @ W1 + b1
+out2 = out1 @ W2 + b2
 
-loss = cross_entropy(predict=p, label=c, one_hot=False)
-optimizer = GradientDescentOptimizer(learning_rate=1e-3)
-
-# define feed dict
-feed_dict = {
-    X : np.concatenate([blue_points, red_points], axis=0),
-    c : [[1, 0]] * len(blue_points) + [[0, 1]] * len(red_points)
-}
+loss = mean_square_error(predict=out2, label=Y)
 
 session = Session()
+optimizer = SGD(learning_rate=1e-7)
 
 losses = []
 
-for epoch in range(10):
-    loss = session.run(root_op=loss, feed_dict=feed_dict)
+for epoch in range(20):
+    session.run(root_op=loss, feed_dict={X : train_X, Y : train_Y})
     losses.append(loss.numpy)
     optimizer.minimize(loss)
     print(f"\033[32m[Epoch:{epoch}]\033[0m loss:{loss.numpy}")
 
-W_weight = W.to_numpy()
-b_weight = b.numpy
+session.run(root_op=loss, feed_dict={X : test_X, Y : test_Y})
+predict = out2.numpy
 
-x = np.arange(-4, 4, 0.1)
-y = -W_weight[0][0] / W_weight[1][0] * x - b_weight[0][0] / W_weight[1][0]
-
-
-plt.style.use(['dark_background'])
+plt.style.use("seaborn")
 plt.subplot(1, 2, 1)
 plt.plot(losses, "-o")
-plt.ylabel("loss")
-plt.xlabel("#iteration")
-
+plt.grid(True)
 plt.subplot(1, 2, 2)
-plt.scatter(red_points[:, 0], red_points[:, 1], color="red")
-plt.scatter(blue_points[:, 0], blue_points[:, 1], color="blue")
-plt.plot(x, y)
-plt.xlabel("$X_1$")
-plt.ylabel("$X_2$")
+plt.plot(test_Y.reshape(-1), "r", label="ground truth", alpha=0.5)
+plt.plot(predict.reshape(-1), "b", label="predict", alpha=0.5)
+plt.legend()
+plt.grid(True)
+
+
 plt.show()

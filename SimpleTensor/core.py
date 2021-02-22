@@ -1,270 +1,216 @@
-# -*- coding:utf-8 -*-
+# -*- encoding:utf-8 -*-
 # author: Zhelong Huang
-# version: 1.0.0
+# version:1.0.1
+
 import numpy as np
 from queue import Queue
-from typing import Union
-import sys
+from typing import Union, List
 
-_default_graph = None
+class Node : pass
+class add : pass
+class minus : pass
+class negative : pass
+class multiply : pass
+class elementwise_pow : pass
 
-class Graph(object):  # our calculate graph
-    def __init__(self):
-        self.operations = []    # operation node
-        self.Placeholders = []  # token node
-        self.variables = []     # variable node
-
-    def as_default(self):  # set the object as the global graph once it is instanced
-        global _default_graph
-        _default_graph = self
+_default_graph = []
 
 class Node(object):
     def __init__(self):
-        self.output = None          # output is the current value of the node
-        self.consumers = []         # consumers log all the node that uses this operation
+        """
+            base for all types of node in the static calculation graph
+        """
+        self.next_nodes = []
+        self.data = None
+        _default_graph.append(self)
+    
+    def __neg__(self):
+        return negative(self)
 
-    def __add__(self, x):
-        return add(self, x)
+    def __add__(self, node : Node):
+        return add(self, node)
+    
+    def __sub__(self, node : Node):
+        return minus(self, node)
+
+    def __mul__(self, node : Node):
+        return multiply(self, node)
+    
+    def __pow__(self, y : Union[int, float]):
+        return elementwise_pow(self, y)
+    
+    def __matmul__(self, node : Node):
+        return matmul(self, node)
 
     def __str__(self):
-        return f"{self.__class__.__name__}({str(self.output)})"
+        return f"{self.__class__.__name__}({str(self.data)})"
     
     @property
     def numpy(self):
-        if self.output is None:
+        if self.data is None:
             raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
-        return np.array(self.output)
-    
+        return np.array(self.data)
+
     @property
     def shape(self):
-        if self.output is None:
+        if self.data is None:
             raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
-        return np.array(self.output).shape
+        return np.array(self.data).shape
     
     def to_numpy(self):
-        if self.output is None:
+        if self.data is None:
             raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
-        return np.array(self.output)
-
+        return np.array(self.data)
+    
     def to_list(self):
-        if self.output is None:
+        if self.data is None:
             raise ValueError(f"the node {self.__class__} is empty, please run the session first!")
-        return list(self.output)
+        return list(self.data)
 
-
-class Operation(Node):  # operation object, it will generate all the operation object 
-    def __init__(self, input_nodes : list = []):
+class Operation(Node):
+    def __init__(self, input_nodes : List[Node] = []):
         super().__init__()
         self.input_nodes = input_nodes
-        for node in input_nodes:  # input nodes also have a consumers
-            node.consumers.append(self)
-
-        # add to global graph
-        _default_graph.operations.append(self)
-
-    def compute(self):  # work as a virtual function
+        for node in input_nodes:
+            node.next_nodes.append(self)
+    
+    def compute(self, *args):
         pass
 
 
 class Placeholder(Node):
     def __init__(self):
         super().__init__()
-        # add to global graph
-        _default_graph.Placeholders.append(self)
 
 class Variable(Node):
-    def __init__(self, initial_value=None):
+    def __init__(self, init_value : Union[np.ndarray, list] = None):
         super().__init__()
-        if not isinstance(initial_value, np.ndarray):
-            initial_value = np.array(initial_value)
-        self.value = initial_value
-        # add to global graph
-        _default_graph.variables.append(self)
-
+        self.data = init_value
 
 class add(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation], y : Union[Placeholder, Variable, Operation]):
-        super(add, self).__init__([x, y])
+    def __init__(self, x : Node, y : Node):
+        super().__init__(input_nodes=[x, y])
+    
+    def compute(self, x_v : np.ndarray, y_v : np.ndarray):
+        return x_v + y_v
 
-    def compute(self, x_value, y_value):
-        # ensure the input node is an ndarray object
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        if not isinstance(y_value, np.ndarray):
-            y_value = np.array(y_value)
-        return x_value + y_value
-
+class minus(Operation):
+    def __init__(self, x : Node, y : Node):
+        super().__init__(input_nodes=[x, y])
+    
+    def compute(self, x_v : np.ndarray, y_v : np.ndarray):
+        return x_v - y_v
 
 class negative(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation]):
-        super(negative, self).__init__([x])
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
     
-    def compute(self, x_value):
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        return -x_value
+    def compute(self, x_v : np.ndarray):
+        return -1. * x_v
 
-class matmul(Operation):  # matrix multiply object
-    def __init__(self, x : Union[Placeholder, Variable, Operation], y : Union[Placeholder, Variable, Operation]):
-        super(matmul, self).__init__([x, y])
+class elementwise_pow(Operation):
+    def __init__(self, x : Node, y : Union[int, float]):
+        super().__init__(input_nodes=[x])
+        self.y = y
+    
+    def compute(self, x_v : np.ndarray):
+        return x_v ** self.y
 
-    def compute(self, x_value, y_value):
-        # ensure the input node is an ndarray object
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        if not isinstance(y_value, np.ndarray):
-            y_value = np.array(y_value)
-        return x_value.dot(y_value)
+class matmul(Operation):
+    def __init__(self, x : Node, y : Node):
+        super().__init__(input_nodes=[x, y])
+    
+    def compute(self, x_v : np.ndarray, y_v : np.ndarray):
+        return x_v @ y_v
 
 class multiply(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation], y : Union[Placeholder, Variable, Operation]):
-        super(multiply, self).__init__([x, y])
+    def __init__(self, x : Node, y : Node):
+        super().__init__(input_nodes=[x, y])
     
-    def compute(self, x_value, y_value):
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        if not isinstance(y_value, np.ndarray):
-            y_value = np.array(y_value)
-        return x_value * y_value
+    def compute(self, x_v : np.ndarray, y_v : np.ndarray):
+        return x_v * y_v
 
 class reduce_sum(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation], axis=None):
-        super(reduce_sum, self).__init__([x])
+    def __init__(self, x : Node, axis : int = None):
+        super().__init__(input_nodes=[x])
         self.axis = axis
     
-    def compute(self, x_value):
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        return np.sum(x_value, axis=self.axis)
+    def compute(self, x_v : np.ndarray):
+        return np.sum(x_v, axis=self.axis)
 
+class reduce_mean(Operation):
+    def __init__(self, x : Node, axis : int = None):
+        super().__init__(input_nodes=[x])
+        self.axis = axis
+    
+    def compute(self, x_v : np.ndarray):
+        return np.mean(x_v, axis=self.axis)
 
 class log(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation]):
-        super(log, self).__init__([x])
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
     
-    def compute(self, x_value):
-        if not isinstance(x_value, np.ndarray):
-            x_value = np.array(x_value)
-        return np.log(x_value)
+    def compute(self, x_v : np.ndarray):
+        return np.log(x_v)
 
- 
 class sigmoid(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation]):
-        super(sigmoid, self).__init__([x])
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
     
-    def compute(self, x_value):
-        return 1 / (1 + np.exp(-x_value))
-
+    def compute(self, x_v : np.ndarray):
+        return 1 / (1 + np.exp(-1. * x_v))
 
 class softmax(Operation):
-    def __init__(self, x : Union[Placeholder, Variable, Operation], axis=0):
-        super(softmax, self).__init__([x])
+    def __init__(self, x : Node, axis : int = None):
+        super().__init__(input_nodes=[x])
         self.axis = axis
-
-    def compute(self, x_value):
-        reduce_shape = list(np.array(x_value).shape)
+    
+    def compute(self, x_v : np.ndarray):
+        ex = np.exp(x_v)
+        reduce_shape = list(x_v.shape)
         reduce_shape[self.axis] = 1
-        return np.exp(x_value) / np.sum(np.exp(x_value), axis=self.axis).reshape(reduce_shape)   # reshape for boardcast
+        return ex / np.sum(ex, axis=self.axis).reshape(reduce_shape)
 
-# loss function
-def cross_entropy(predict : Union[Placeholder, Variable, Operation], label : Union[Placeholder, Variable, Operation], one_hot : bool = True):
-    """
-        predict: predict value of net, can be the result of softmax
-        label: label, can be index or one hot vector
-        one_hot: if True, do one hot encoding to label
-    """
-    # TODO : solve 
-    # if one_hot:
-    #     indexes = label.numpy.reshape(-1)
-    #     one_hot_vectors = np.zeros(shape=predict.shape)
-    #     one_hot_vectors[indexes] = 1
-    #     for i, _ in enumerate(one_hot_vectors):
-    #         one_hot_vectors[i][indexes[i]] = 1
-    #     label.output = one_hot_vectors
+def cross_entropy(predict : Node, label : Node, reduction : str = "mean"):
+    __reductions__ = ["mean", "sum"]
+    if reduction == "mean":
+        return - reduce_mean(label * log(predict))
+    elif reduction == "sum":
+        return - reduce_sum(label * log(predict))
+    else:
+        raise Exception(f"reduction only receive {__reductions__}")
 
-    # if label.shape != predict.shape:
-    #     raise ValueError(f"In CrossEntropy loss, label must share the same shape with predict, but receive predict.shape={predict.shape}, label.shape={label.shape}")
-    
-    return negative(reduce_sum(reduce_sum(multiply(label, log(predict)), axis=1)))
+def mean_square_error(predict : Node, label : Node, reduction : str = "mean"):
+    __reductions__ = ["mean", "sum"]
+    if reduction == "mean":
+        return reduce_mean((predict - label) ** 2)
+    elif reduce_mean == "sum":
+        return reduce_sum((predict - label) ** 2)
+    else:
+        raise Exception(f"reduction only receive {__reductions__}")
 
-
-class Session(object):  # Session object calculate the input calculation graph
-    def run(self, root_op : Operation, feed_dict={}):
-        """
-        operation: root node of the graph
-        feed_dict: corresponding value of the Placeholder
-        return: root node of the graph
-        """
-        all_nodes = self.__get_all_nodes(root_op)
-        for node in all_nodes:
-            if isinstance(node, Placeholder):   # if the node is a Placeholder, query the feed_dict to get the value
-                node.output = np.array(feed_dict[node])
-            elif isinstance(node, Variable):    # if the node is a Variable, its own value is the output
-                node.output = np.array(node.value)
-            else:       # if the node is an operation, call its 'compute' method to get the output
-                node.inputs = [node.output for node in node.input_nodes]
-                # use the 'compute' method to calculate operation node's output
-                node.output = node.compute(*node.inputs)
-                # transform to ndarray
-                node.output = np.array(node.output)
-
-        return root_op        # return root node
-    
-    
-    def __get_all_nodes(self, operation):  # get all the nodes based on the root operation recursively
-        all_nodes = []
-        def recurse(node):
-            if isinstance(node, Operation):   # only operation node has son node, and it needs recursion
-                for n in node.input_nodes:
-                    recurse(n)
-            all_nodes.append(node)
-
-        recurse(operation)   # call build-in recursive function
-        return all_nodes
-
-
-class GradientDescentOptimizer(object):
-    def __init__(self, learning_rate : float = 1e-3):
-        self.learning_rate = learning_rate
-    
-    def minimize(self, loss : Operation):
-        learning_rate = self.learning_rate
-        # operate its son class
-        grad_table = compute_gradient(loss)
-        # iterate all the nodes
-        for node in grad_table:
-            if isinstance(node, Variable):
-                # find the corresponding grad of the node
-                grad = grad_table[node]
-                # use gradient descent
-                node.value = - learning_rate * grad
-        return 
-
+# register module
 class Register(dict):
     def __init__(self, *args, **kwargs):
         super(Register, self).__init__(*args, **kwargs)
         self._dict = {}
     
     def register(self, target):
-        def add_register_item(key, value):
+        def add_register_items(key, value):
             if not callable(value):
-                raise Exception(f"register object must be callable! But receice:{value} is not callable!")
+                raise ValueError(f"register object must be callable, but receive {type(value)}")
             if key in self._dict:
                 print(f"warning: \033[33m{value.__name__} has been registered before, so we will overriden it\033[0m")
             self[key] = value
             return value
+        return add_register_items(target.__name__, target) if callable(target) else lambda x : add_register_items(target, x)
 
-        if callable(target):            # 如果传入的目标可调用，说明之前没有给出注册名字，我们就以传入的函数或者类的名字作为注册名
-            return add_register_item(target.__name__, target)
-        else:                           # 如果不可调用，说明额外说明了注册的可调用对象的名字
-            return lambda x : add_register_item(target, x)
-    
-    def __call__(self, target):
-        return self.register(target)
-    
+    def __call__(self, *args, **kwargs):
+        return self.register(*args, **kwargs)
+
     def __setitem__(self, key, value):
         self._dict[key] = value
-
+    
     def __getitem__(self, key):
         return self._dict[key]
     
@@ -272,8 +218,8 @@ class Register(dict):
         return key in self._dict
     
     def __str__(self):
-        return str(self._dict)
-    
+        return f"{str(self._dict)}"
+
     def keys(self):
         return self._dict.keys()
     
@@ -283,123 +229,223 @@ class Register(dict):
     def items(self):
         return self._dict.items()
 
-# create register dict
-_gradient_registry = Register()
-@_gradient_registry("add")     # chain law
-def __add_gradient(consumer : Operation, grad : float):
-    shape1 = consumer.input_nodes[0].shape
-    shape2 = consumer.input_nodes[1].shape
-    grad_shape = grad.shape
+_register_grad_functions = Register()
+def __get_grad_by_shape(node : Node, grad : np.ndarray):
+        node_shape, grad_shape = node.shape, grad.shape
+        if node_shape == grad_shape:
+            return grad
+        else:
+            for axis, _ in enumerate(grad_shape):
+                if grad_shape[axis] != node_shape[axis]:
+                    break
+            return grad.mean(axis=axis).reshape(node_shape)
 
-    # prevent automatic boardcast calculation
-    if shape1 == grad_shape:
-        grad1 = grad
-    else:
-        for axis, _ in enumerate(grad_shape):
-            if grad_shape[axis] != shape1[axis]:
-                break
-        grad1 = grad.mean(axis=axis).reshape(shape1)
-    
-    if shape2 == grad_shape:
-        grad2 = grad
-    else:
-        for axis, _ in enumerate(grad_shape):
-            if grad_shape[axis] != shape2[axis]:
-                break
-        grad2 = grad.mean(axis=axis).reshape(shape2)
-
-    return np.array([grad1, grad2])
-
-@_gradient_registry("negative")
-def __negative_gradient(consumer : Operation, grad : float):          
-    return np.array([-1. * grad])                       
-
-@_gradient_registry("reduce_sum")
-def __reduce_sum_gradient(consumer : Operation, grad : float):
-    return np.array([grad])
-
-@_gradient_registry("matmul")
-def __matmul_gradient(consumer : Operation, grad : float):
-    A = np.array(consumer.input_nodes[0].output)
-    B = np.array(consumer.input_nodes[1].output)
-    grad = np.array(grad)
+@_register_grad_functions("add")
+def __add_gradient(op_node : Operation, grad : np.ndarray):
     return np.array([
-        np.dot(grad, B.T),
-        np.dot(A.T, grad)
+        1. * __get_grad_by_shape(op_node.input_nodes[0].data, grad),
+        1. * __get_grad_by_shape(op_node.input_nodes[1].data, grad)
     ])
 
+@_register_grad_functions("minus")
+def __minus_gradient(op_node : Operation, grad : np.ndarray):
+    return np.array([
+        1. * __get_grad_by_shape(op_node.input_nodes[0].data, grad),
+        -1. * __get_grad_by_shape(op_node.input_nodes[1].data, grad)
+    ])
 
-@_gradient_registry("multiply")
-def __multiply_gradient(consumer : Operation, grad : float):
-    x = consumer.input_nodes[0].output
-    y = consumer.input_nodes[1].output
+@_register_grad_functions("negative")
+def __negative_gradient(op_node : Operation, grad : np.ndarray):
+    return np.array([-1. * grad])
+
+@_register_grad_functions("elementwise_pow")
+def __elementwise_pow_gradeint(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    y = op_node.y
+    return np.array([y * (x ** (y - 1)) * grad])
+
+@_register_grad_functions("matmul")
+def __matmul_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    y = op_node.input_nodes[1].data
+    return np.array([grad @ y.T, x.T @ grad])
+
+@_register_grad_functions("multiply")
+def __multiply_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    y = op_node.input_nodes[1].data
     return np.array([y * grad, x * grad])
 
-@_gradient_registry("log")
-def __log_gradient(consumer : Operation, grad : float):
-    x = consumer.input_nodes[0].output
+@_register_grad_functions("reduce_sum")
+def __reduce_sum_gradient(op_node : Operation, grad : np.ndarray):
+    return np.array([1. * grad])
+
+@_register_grad_functions("reduce_mean")
+def __reduce_mean_gradient(op_node : Operation, grad : np.ndarray):
+    multiplier = op_node.input_nodes[0].data.size / op_node.data.size
+    return np.array([1. / multiplier * grad])
+
+@_register_grad_functions("log")
+def __log_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
     return np.array([1. / x * grad])
 
-@_gradient_registry("sigmoid")
-def __sigmoid_gradient(consumer : Operation, grad : float):
-    x = consumer.input_nodes[0].output
-    e_minus_x = np.exp(-1. * x)
-    return np.array([(e_minus_x) / ((1 + e_minus_x) ** 2) * grad]) 
+@_register_grad_functions("sigmoid")
+def __sigmoid_gradient(op_node : Operation, grad : np.ndarray):
+    x = op_node.input_nodes[0].data
+    emx = np.exp(-1. * x)
+    return np.array([emx / ((1 + emx) ** 2) * grad])
 
-@_gradient_registry("softmax")
-def __softmax_gradient(consumer : Operation, grad : float):
-    x = consumer.input_nodes[0].output
-    return x * (1 - x)
+@_register_grad_functions("softmax")
+def __softmax_gradient(op_node : Operation, grad : np.ndarray):
+    f = op_node.data
+    return f * (1 - f)
+
+# create session to update nodes' data in the graph
+class Session(object):
+    def run(self, root_op : Operation, feed_dict : dict = {}):
+        all_nodes = self.__get_all_nodes(root_op)
+
+        for node in all_nodes:
+            if isinstance(node, Variable):
+                node.data = np.array(node.data)
+            elif isinstance(node, Placeholder):
+                node.data = np.array(feed_dict[node])
+            else:
+                input_datas = [n.data for n in node.input_nodes]
+                node.data = node.compute(*input_datas)
+
+        return root_op
+    
+    def __get_all_nodes(self, root):        # get all the nodes before and include "root"
+        all_nodes = []
+        def recurse(node):
+            if isinstance(node, Operation):
+                for n in node.input_nodes:
+                    recurse(n)
+            all_nodes.append(node)
+        recurse(root)
+        return all_nodes
+
+# optimizer
+class Optimizer(object):
+    def __init__(self, learning_rate : float = 1e-3):
+        """
+            base for all the optimizer
+        """
+        self.learning_rate = learning_rate
+    
+    def __backwards(self, op_node : Operation):
+        """
+            do the BP from the op_node, 
+            return a gradient dict including op_node's gradients with respect to all the nodes before op_node
+        """
+        # wo will do the BP through BFS
+        grad_table = {}
+        grad_table[op_node] = 1.
+        visit_nodes = set()
+        queue = Queue()
+        visit_nodes.add(op_node)
+        queue.put(op_node)
+
+        while not queue.empty():
+            cur_node = queue.get()
+
+            if cur_node != op_node:
+                grad_table[cur_node] = 0.
+                for next_node in cur_node.next_nodes:
+                    grad_loss_wrt_next_node = grad_table[next_node]                                 # loss gradient of next_node
+                    next_node_op_name = next_node.__class__.__name__                                # next_node must be an Operation, we get its name
+                    gradient_func = _register_grad_functions[next_node_op_name]                     # get next_node's corresponding gradient function
+
+                    grad_loss_wrt_cur_node = gradient_func(next_node, grad_loss_wrt_next_node)      # call the gradient function to get the sub-gradient
+                    
+                    if len(next_node.input_nodes) == 1:                                            # if next_node represents monocular operators, then add to total gradient directly
+                        grad_table[cur_node] += grad_loss_wrt_cur_node
+                    else:                                                                           # else get the portion size of gradient
+                        cur_node_in_next_node_index = next_node.input_nodes.index(cur_node)
+                        grad_table[cur_node] += grad_loss_wrt_cur_node[cur_node_in_next_node_index]
+
+            if isinstance(cur_node, Operation):                                                     # put next op node into queue to do the BFS
+                for input_node in cur_node.input_nodes:
+                    if input_node not in visit_nodes:                                               # only add nodes which haven't been updated/visited yet
+                        visit_nodes.add(input_node)
+                        queue.put(input_node)
+
+        return grad_table
+
+    def minimize(self, loss_node : Operation):
+        """
+            concrete optimizer method, 
+            this method will update parameters before "loss" node(include loss)
+        """
+        pass
 
 
-
-def compute_gradient(loss : Operation):
-    grad_table = {}
-    # initial value of loss
-    grad_table[loss] = 1
-    # use BFS to implement BP
-    visit = set()
-    queue = Queue()
-    visit.add(loss)
-    queue.put(loss)     # put first element into the queue
-
-    while not queue.empty():
-        node = queue.get()      # get head of queue
-
-        if node != loss:
-            grad_table[node] = 0
-            for consumer in node.consumers:
-                # get loss's gradient given to comsumer node
-                lossgrad_wrt_consumer_output = grad_table[consumer]
-                operation_name = consumer.__class__.__name__
-                # bprop is the corresponding instance of operation node
-                gradient_func = _gradient_registry[operation_name]
-                # get all the gradient of all the concrete consumer nodes
-                lossgrads_wrt_consumer_inputs = gradient_func(consumer, lossgrad_wrt_consumer_output)
+class SGD(Optimizer):   # Stochastic gradient descent 
+    def __init__(self, learning_rate : float = 1e-3):
+        super().__init__(learning_rate=learning_rate)
+    
+    def minimize(self, loss_node : Operation):
+        lr = self.learning_rate
+        grad_table = self._Optimizer__backwards(op_node=loss_node)
+        for node in grad_table:
+            if isinstance(node, Variable):
+                grad = grad_table[node]
+                node.data -= lr * grad
                 
-                if len(consumer.input_nodes) == 1:
-                    grad_table[node] += lossgrads_wrt_consumer_inputs
-                else:
-                    # consumer.input_nodes is a list, so the index is the method of list 
-                    node_index_in_consumer_inputs = consumer.input_nodes.index(node)
-                    grad_table[node] += lossgrads_wrt_consumer_inputs[node_index_in_consumer_inputs]
+        return grad_table
 
-        # put the node into the queue
-        if hasattr(node, "input_nodes"):
-            for input_node in node.input_nodes:
-                if input_node not in visit:
-                    visit.add(input_node)
-                    queue.put(input_node)
-    return grad_table
-
-Graph().as_default()
-                
 if __name__ == "__main__":
-    a = Variable([[2, 1], [-1, -2]])
-    b = Variable([1, 1])
-    c = Placeholder()
-    y = matmul(a, b)
+    from sklearn.datasets import load_boston 
+    import matplotlib.pyplot as plt
 
-    # TODO : nan appears in the graph, need to be solved
-    # TODO : gradient need to be clipped
-    # TODO : integate several loss functions
+    X, Y = load_boston(return_X_y=True)
+
+    sample_num = X.shape[0]
+    ratio = 0.8
+    offline = int(ratio * sample_num)
+    indexes = np.arange(sample_num)
+    np.random.shuffle(indexes)
+
+    train_X, train_Y = X[indexes[:offline]], Y[indexes[:offline]].reshape([-1, 1])
+    test_X, test_Y = X[indexes[offline:]], Y[indexes[offline:]].reshape([-1, 1])
+
+    X = Placeholder()
+    Y = Placeholder()
+    W1 = Variable(np.random.randn(13, 4))
+    b1 = Variable(np.random.randn(1, 4))
+    W2 = Variable(np.random.randn(4, 1))
+    b2 = Variable(np.random.randn(1, 1))
+    
+    out1 = X @ W1 + b1
+    out2 = out1 @ W2 + b2
+
+    loss = mean_square_error(predict=out2, label=Y)
+
+    session = Session()
+    optimizer = SGD(learning_rate=1e-7)
+
+    losses = []
+
+    for epoch in range(20):
+        session.run(root_op=loss, feed_dict={X : train_X, Y : train_Y})
+        losses.append(loss.numpy)
+        optimizer.minimize(loss)
+        print(f"\033[32m[Epoch:{epoch}]\033[0m loss:{loss.numpy}")
+
+    session.run(root_op=loss, feed_dict={X : test_X, Y : test_Y})
+    predict = out2.numpy
+
+    plt.style.use("seaborn")
+    plt.subplot(1, 2, 1)
+    plt.plot(losses, "-o")
+    plt.grid(True)
+    plt.subplot(1, 2, 2)
+    plt.plot(test_Y.reshape(-1), "r", label="ground truth", alpha=0.5)
+    plt.plot(predict.reshape(-1), "b", label="predict", alpha=0.5)
+    plt.legend()
+    plt.grid(True)
+
+
+    plt.show()
