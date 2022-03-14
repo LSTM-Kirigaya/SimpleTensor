@@ -44,7 +44,6 @@ losses = []
 acces  = []
 for epoch in range(10):
     session.run(root_op=loss, feed_dict={X : train_X, Y : label})
-    losses.append(loss.numpy)
     optimizer.minimize(loss)
     pre_lab = np.argmax(out1.numpy, axis=1)
     acc = accuracy_score(train_Y, pre_lab)

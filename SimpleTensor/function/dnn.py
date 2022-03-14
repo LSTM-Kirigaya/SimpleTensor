@@ -15,6 +15,9 @@ class Linear(DnnOperator):
         self.output_dim = output_dim
         if act and act not in runtime.activate_func:
             raise ValueError(f"input activate function '{act}' is not in registered activate function list:{list(runtime.activate_func.keys())}")
+        
+        # TODO : consider a clever solution to initialize parameters
+        # Now, it is unstable
         self.W = Variable(np.random.randn(input_dim, output_dim), node_name=self.cur_name)
         if bias:
             self.b = Variable(np.random.randn(1, output_dim), node_name=self.cur_name)
