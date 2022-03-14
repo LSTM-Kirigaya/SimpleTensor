@@ -1,65 +1,61 @@
-from SimpleTensor.core import Placeholder, Variable
-from SimpleTensor.core import Session
-from SimpleTensor.core import mean_square_error, SGD, Linear
-from SimpleTensor.core import view_graph
+import SimpleTensor as st
+from SimpleTensor.function.measure import CrossEntropy
+from SimpleTensor.optimizer import SGD
+from SimpleTensor.view import view_graph
 
-from sklearn.datasets import load_boston 
+from sklearn.datasets import load_iris
+from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
+import seaborn
 
-X, Y = load_boston(return_X_y=True)
+train_X = pd.read_csv("./train_feature.csv", header=None).to_numpy().astype("float32")
+train_Y = pd.read_csv("./train_target.csv", header=None).to_numpy()
 
-np.random.seed(123)
-sample_num = X.shape[0]
-ratio = 0.8
-offline = int(ratio * sample_num)
-indexes = np.arange(sample_num)
-np.random.shuffle(indexes)
 
-train_X, train_Y = X[indexes[:offline]], Y[indexes[:offline]].reshape([-1, 1])
-test_X, test_Y = X[indexes[offline:]], Y[indexes[offline:]].reshape([-1, 1])
+train_X = (train_X - train_X.min(axis=0)) / np.ptp(train_X, axis=0) 
 
-X = Placeholder()
-Y = Placeholder()
+# df = pd.DataFrame({
+#     "x1" : train_X[:, 0],
+#     "x2" : train_X[:, 1],
+#     "y" : train_Y.reshape(-1)
+# })
 
-out1 = Linear(13, 8, act="relu")(X)
-out2 = Linear(8, 4, act=None)(out1)
-out3 = Linear(4, 1, act=None)(out2)
+# seaborn.scatterplot(data=df, x="x1", y="x2", hue="y")
+# plt.show()
 
-loss = mean_square_error(predict=out3, label=Y)
+label = st.numpy_one_hot(train_Y)
 
-session = Session()
-optimizer = SGD(learning_rate=1e-8)
+X = st.Placeholder()
+Y = st.Placeholder()
+
+out1 = st.dnn.Linear(2, 2, act="sigmoid")(X)
+# out2 = Linear(8, 16, act="sigmoid")(out1)
+# out3 = Linear(16, 8)(out2)
+# out4 = Linear(8, 2, act="sigmoid")(out3)
+
+
+loss = CrossEntropy(reduction="mean")(predict=out1, label=Y)
+session = st.Session()
+optimizer = SGD(learning_rate=1e-2)
 
 losses = []
-
-for epoch in range(30):
-    session.run(root_op=loss, feed_dict={X : train_X, Y : train_Y})
+acces  = []
+for epoch in range(10):
+    session.run(root_op=loss, feed_dict={X : train_X, Y : label})
     losses.append(loss.numpy)
     optimizer.minimize(loss)
-    print(f"\033[32m[Epoch:{epoch}]\033[0m loss:{loss.numpy}")
+    pre_lab = np.argmax(out1.numpy, axis=1)
+    acc = accuracy_score(train_Y, pre_lab)
+    print(f"\033[32m[Epoch:{epoch}]\033[0m loss: {loss.numpy} accuracy: {acc}")
+    losses.append(loss.numpy)
+    acces.append(acc)
 
-session.run(root_op=loss, feed_dict={X : test_X, Y : test_Y})
-predict = out3.numpy
-
-plt.style.use("seaborn")
-plt.subplot(1, 2, 1)
-plt.plot(losses, "-o")
-plt.xlabel("number of iteration")
-plt.ylabel("mean loss")
-plt.grid(True)
-plt.subplot(1, 2, 2)
-plt.plot(test_Y.reshape(-1), "r", label="ground truth", alpha=0.5)
-plt.plot(predict.reshape(-1), "b", label="predict", alpha=0.5)
-plt.xlabel("sample id")
-plt.ylabel("price")
+plt.style.use("gadfly")
+plt.plot(losses, label="loss")
+plt.plot(acces,  label="acc")
 plt.legend()
-plt.grid(True)
-
 plt.show()
 
-# from SimpleTensor.core import _default_graph
-# for item in _default_graph:
-#     print(item.__class__)
-
-# view_graph(node=loss, format="pdf")
+view_graph(format="pdf", direction="LR", show_grad=True)
