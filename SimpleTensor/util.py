@@ -92,3 +92,4 @@ def numpy_one_hot(y: np.ndarray, class_num: int=None) -> np.ndarray:
     for i in range(y.shape[0]):
         one_hot[i][y[i]] = 1
     return one_hot
+

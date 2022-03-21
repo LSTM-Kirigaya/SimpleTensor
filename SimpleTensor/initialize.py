@@ -1,11 +1,14 @@
 import numpy as np
 from SimpleTensor.constant import EPSILON
+from SimpleTensor import runtime
 
+@runtime.init_func("normal")
 def normal_init(shape, mean=1, std=0.01) -> np.ndarray:
     """ submit N(1, 0.01) by default
     """
     return np.random.normal(mean, std, shape)
 
+@runtime.init_func("uniform")
 def uniform_init(shape, input_size=None, output_size=None) -> np.ndarray:
     """ submit to U(-1/sqrt(input_size), 1/sqrt(output_size))
     """
@@ -19,6 +22,7 @@ def uniform_init(shape, input_size=None, output_size=None) -> np.ndarray:
         size=shape
     )
 
+@runtime.init_func("x_normal")
 def xavier_normal_init(shape, input_size=None, output_size=None) -> np.ndarray:
     # from paper: Understanding the difficulty of training deep feedforward neural networks
     # I recommend this method when you use tanh, sigmoid
@@ -32,6 +36,7 @@ def xavier_normal_init(shape, input_size=None, output_size=None) -> np.ndarray:
         size=shape
     )
 
+@runtime.init_func("x_uniform")
 def xavier_uniform_init(shape, input_size=None, output_size=None) -> np.ndarray:
     # from paper: Understanding the difficulty of training deep feedforward neural networks
     # I recommend this method when you use tanh, sigmoid
@@ -41,26 +46,33 @@ def xavier_uniform_init(shape, input_size=None, output_size=None) -> np.ndarray:
         output_size = shape[1]
     return np.random.uniform(
         low=-np.sqrt(6 / (input_size + output_size) + EPSILON),
-        high=np.sqrt(6 / (input_size + output_size) + EPSILON)
+        high=np.sqrt(6 / (input_size + output_size) + EPSILON),
+        size=shape
     )
 
-def he_normal_init(shape, input_size=None, output_size=None) -> np.ndarray:
+@runtime.init_func("he_normal")
+def he_normal_init(shape, input_size=None) -> np.ndarray:
     # from paper: Delving deep into rectifiers: Surpassing human-level performance on ImageNet classification
     # I recommend this method when you use ReLU, Leaky ReLU
     if input_size is None:
         input_size = shape[0]
-    if output_size is None:
-        output_size = shape[1]
-    return 
+    return np.random.normal(
+        loc=0,
+        scale=np.sqrt(2 / input_size + EPSILON),
+        size=shape
+    )
 
-def he_normal_init(shape, input_size=None, output_size=None) -> np.ndarray:
+@runtime.init_func("he_uniform")
+def he_uniform_init(shape, input_size=None) -> np.ndarray:
     # from paper: Delving deep into rectifiers: Surpassing human-level performance on ImageNet classification
     # I recommend this method when you use ReLU, Leaky ReLU
     if input_size is None:
         input_size = shape[0]
-    if output_size is None:
-        output_size = shape[1]
-
+    return np.random.uniform(
+        low=-np.sqrt(6 / input_size + EPSILON),
+        high=np.sqrt(6 / input_size + EPSILON),
+        size=shape
+    )
 
 
 if __name__ == "__main__":

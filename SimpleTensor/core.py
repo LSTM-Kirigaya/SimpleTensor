@@ -98,7 +98,11 @@ class Session(object):
             if isinstance(node, Variable):
                 node.data = np.array(node.data)
             elif isinstance(node, Placeholder):
-                node.data = np.array(feed_dict[node])
+                try:
+                    node.data = np.array(feed_dict[node])
+                except:
+                    print(feed_dict.keys())
+                    exit(-1)
             else:
                 input_datas = [n.data for n in node.input_nodes]
                 node.data = node.compute(*input_datas)
@@ -112,6 +116,12 @@ class DnnOperator(abc.ABC):
     @abc.abstractmethod
     def __call__(self) -> Node: ...
 
+class DnnVarOperator(DnnOperator):
+    @abc.abstractmethod
+    def reset_params(self) -> None:  ...
+
+    @abc.abstractmethod
+    def get_params(self, *args, **kwargs) -> np.ndarray: ...
 
 # ==============================
 # basic function used in core.py

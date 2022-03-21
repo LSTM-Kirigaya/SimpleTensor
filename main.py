@@ -10,8 +10,6 @@ import seaborn
 
 train_X = pd.read_csv("./train_feature.csv", header=None).to_numpy().astype("float32")
 train_Y = pd.read_csv("./train_target.csv", header=None).to_numpy()
-
-
 train_X = (train_X - train_X.min(axis=0)) / np.ptp(train_X, axis=0) 
 
 # df = pd.DataFrame({

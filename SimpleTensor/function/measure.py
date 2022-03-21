@@ -6,6 +6,7 @@
 from SimpleTensor import Node, DnnOperator
 from SimpleTensor import log, reduce_mean, reduce_sum
 from SimpleTensor import core
+import numpy as np
 
 class CrossEntropy(DnnOperator):
     __reduction__ = {

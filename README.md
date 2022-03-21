@@ -28,7 +28,7 @@ Have fun!
 - [ ] support 2D conv
 - [ ] support RNN
 - [ ] resolve the unstable calcualtion problem
-- [ ] reconstruct by ABC
+- [x] reconstruct by ABC
 - [ ] reconstruct by C++/PyBind11
 - [ ] support JIT
 - [ ] lazy module (predefined training pipeline)
@@ -43,8 +43,6 @@ I am going to presenting how the cake is baked instead of being going to tell yo
 
 ```python
 import SimpleTensor as st
-from SimpleTensor.function.measure import CrossEntropy
-from SimpleTensor.optimizer import SGD
 from SimpleTensor.view import view_graph
 
 from sklearn.datasets import load_iris
@@ -57,19 +55,16 @@ import seaborn
 train_X = pd.read_csv("./train_feature.csv", header=None).to_numpy().astype("float32")
 train_Y = pd.read_csv("./train_target.csv", header=None).to_numpy()
 
-
 train_X = (train_X - train_X.min(axis=0)) / np.ptp(train_X, axis=0) 
 
 label = st.numpy_one_hot(train_Y)
-
 X = st.Placeholder()
 Y = st.Placeholder()
-
 out1 = st.dnn.Linear(2, 2, act="sigmoid")(X)
 
-loss = CrossEntropy(reduction="mean")(predict=out1, label=Y)
+loss = st.measure.CrossEntropy(reduction="mean")(predict=out1, label=Y)
 session = st.Session()
-optimizer = SGD(learning_rate=1e-2)
+optimizer = st.optimizer.SGD(learning_rate=1e-2)
 
 losses = []
 acces  = []

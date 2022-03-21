@@ -5,7 +5,6 @@
 
 from SimpleTensor import runtime, Clip
 from SimpleTensor import Operation, Node
-
 import numpy as np
 
 @runtime.activate_func("sigmoid")

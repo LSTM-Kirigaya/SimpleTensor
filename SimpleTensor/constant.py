@@ -21,6 +21,7 @@ class Clip:
 class runtime:
     activate_func = Register()
     gradient_func = Register()
+    init_func     = Register()
     global_calc_graph = list()
     dnn_cnt = defaultdict(int)
     grad_table = None
