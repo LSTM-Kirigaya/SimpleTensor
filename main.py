@@ -1,6 +1,4 @@
 import SimpleTensor as st
-from SimpleTensor.function.measure import CrossEntropy
-from SimpleTensor.optimizer import SGD
 from SimpleTensor.view import view_graph
 
 from sklearn.datasets import load_iris
@@ -30,15 +28,16 @@ label = st.numpy_one_hot(train_Y)
 X = st.Placeholder()
 Y = st.Placeholder()
 
+
 out1 = st.dnn.Linear(2, 2, act="sigmoid")(X)
 # out2 = Linear(8, 16, act="sigmoid")(out1)
 # out3 = Linear(16, 8)(out2)
 # out4 = Linear(8, 2, act="sigmoid")(out3)
 
 
-loss = CrossEntropy(reduction="mean")(predict=out1, label=Y)
+loss = st.measure.CrossEntropy(reduction="mean")(predict=out1, label=Y)
 session = st.Session()
-optimizer = SGD(learning_rate=1e-2)
+optimizer = st.optimizer.SGD(learning_rate=1e-2)
 
 losses = []
 acces  = []

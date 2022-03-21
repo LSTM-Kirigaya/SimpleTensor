@@ -5,6 +5,7 @@ __pycache__/
 
 # previous version
 *backup
+*image
 
 # C extensions
 *.so

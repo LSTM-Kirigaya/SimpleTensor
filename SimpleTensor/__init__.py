@@ -17,3 +17,4 @@ import SimpleTensor.function.activate
 import SimpleTensor.function.gradient
 
 from SimpleTensor import view
+from SimpleTensor.function import measure

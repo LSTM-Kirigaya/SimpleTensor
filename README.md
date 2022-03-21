@@ -14,14 +14,14 @@ This is a try to implement my own framework, my purpose is to have fun when deve
 Have fun!
 
 
----
+
 
 ## Feature
 
 - It is quite light, so you can use it with limited resource(maybe...)
 - It is a good demo to learn how deep learning framework like `TensorFlow` works
 
----
+
 
 ## TODO
 
@@ -36,7 +36,6 @@ Have fun!
 
 
 
----
 
 ## Quick Start
 
@@ -105,7 +104,7 @@ out:
 ![image.png](https://s2.loli.net/2022/03/14/HNZhVcCPx7qM2il.png)
 
 
----
+
 
 
 # Log
