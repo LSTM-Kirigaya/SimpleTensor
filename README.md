@@ -13,16 +13,17 @@ This is a try to implement my own framework, my purpose is to have fun when deve
 
 Have fun!
 
+
 ---
 
-# Feature
+## Feature
 
 - It is quite light, so you can use it with limited resource(maybe...)
 - It is a good demo to learn how deep learning framework like `TensorFlow` works
 
 ---
 
-# TODO
+## TODO
 
 - [ ] support 2D conv
 - [ ] support RNN
@@ -37,7 +38,7 @@ Have fun!
 
 ---
 
-# Quick Start
+## Quick Start
 
 I am going to presenting how the cake is baked instead of being going to tell you how to use it.
 

@@ -75,3 +75,6 @@ class SGD(Optimizer):   # Stochastic gradient descent
 
         runtime.grad_table = grad_table
         return grad_table
+
+# TODO : More powerful optimizer
+# https://www.jianshu.com/p/aebcaf8af76e

@@ -9,7 +9,7 @@ from SimpleTensor import runtime, core
 import numpy as np
 
 class Linear(DnnOperator):
-    def __init__(self, input_dim : int, output_dim : int, bias : bool = True, act : str = None):
+    def __init__(self, input_dim : int, output_dim : int, bias : bool = True, act : str = None, init: str=""):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -18,6 +18,7 @@ class Linear(DnnOperator):
         
         # TODO : consider a clever solution to initialize parameters
         # Now, it is unstable
+        # https://www.cnblogs.com/wxkang/p/15366535.html
         self.W = Variable(np.random.randn(input_dim, output_dim), node_name=self.cur_name)
         if bias:
             self.b = Variable(np.random.randn(1, output_dim), node_name=self.cur_name)
