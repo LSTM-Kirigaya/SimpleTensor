@@ -3,6 +3,7 @@
 # version: 1.0.2
 # date : 2022.3.21
 # caption : used to measure the stability of training
+
 import sys, os
 sys.path.append(os.path.abspath('.'))
 
@@ -36,10 +37,10 @@ train_Y = pd.read_csv("./train_target.csv", header=None).to_numpy()
 train_X = (train_X - train_X.min(axis=0)) / np.ptp(train_X, axis=0) 
 label = st.numpy_one_hot(train_Y)
 X = st.Placeholder()
-Y = st.Placeholder()
-        
+Y = st.Placeholder()        
 optimizer = st.optimizer.SGD(learning_rate=1e-2)
-out = st.dnn.Linear(2, 2, act="sigmoid", init=INIT)(X)
+linear = st.dnn.Linear(2, 2, act="sigmoid", init=INIT)
+out = linear(X)
 loss = st.measure.CrossEntropy(reduction="mean")(predict=out, label=Y)
 session = st.Session()
 
@@ -64,6 +65,7 @@ def main():
             acces.append(acc)
         total_loss_ratio.append(np.mean(loss_ratio))
         total_acc_ratio.append(np.mean(acc_ratio))
+        linear.reset_params()
 
     print("acc increase ratio: ", np.mean(total_acc_ratio))
     print("loss increase ratio: ", np.mean(total_loss_ratio))

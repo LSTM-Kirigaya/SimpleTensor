@@ -1,10 +1,10 @@
-from SimpleTensor.core     import Operation, Placeholder, Variable, Node
+from SimpleTensor.core     import Operation, Placeholder, Variable, Node, Data
 from SimpleTensor.constant import runtime
 from collections import deque, defaultdict
 import numpy as np
 
 def get_node_attr(node: Node) -> dict:
-    if isinstance(node, Placeholder):
+    if isinstance(node, Placeholder) or isinstance(node, Data):
         node_attr = {"color": "#e5864d", "style" : "filled", "fontcolor": "white", "shape" : "rectangle"}
     elif isinstance(node, Variable):
         node_attr = {"color": "#556fca", "style" : "filled", "fontcolor": "white"}

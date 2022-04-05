@@ -12,46 +12,36 @@ train_X = pd.read_csv("./train_feature.csv", header=None).to_numpy().astype("flo
 train_Y = pd.read_csv("./train_target.csv", header=None).to_numpy()
 train_X = (train_X - train_X.min(axis=0)) / np.ptp(train_X, axis=0) 
 
-# df = pd.DataFrame({
-#     "x1" : train_X[:, 0],
-#     "x2" : train_X[:, 1],
-#     "y" : train_Y.reshape(-1)
-# })
-
-# seaborn.scatterplot(data=df, x="x1", y="x2", hue="y")
-# plt.show()
-
 label = st.numpy_one_hot(train_Y)
 
-X = st.Placeholder()
-Y = st.Placeholder()
+X = st.Data(data=train_X)
+Y = st.Data(data=train_Y)
 
+out1 = st.dnn.Linear(2, 8)(X)
+out2 = st.dnn.Linear(8, 2, act="sigmoid")(out1)
 
-out1 = st.dnn.Linear(2, 2, act="sigmoid")(X)
-# out2 = Linear(8, 16, act="sigmoid")(out1)
-# out3 = Linear(16, 8)(out2)
-# out4 = Linear(8, 2, act="sigmoid")(out3)
-
-
-loss = st.measure.CrossEntropy(reduction="mean")(predict=out1, label=Y)
+loss = st.measure.CrossEntropy(reduction="mean")(predict=out2, label=Y)
 session = st.Session()
-optimizer = st.optimizer.SGD(learning_rate=1e-2)
+optimizer = st.optimizer.SGD(learning_rate=1e-3)
 
+# TODO : try to wrap session and optimizer together
 losses = []
 acces  = []
-for epoch in range(10):
-    session.run(root_op=loss, feed_dict={X : train_X, Y : label})
+for epoch in range(20):
+    session.run(root_op=loss)
     optimizer.minimize(loss)
-    pre_lab = np.argmax(out1.numpy, axis=1)
+
+    pre_lab = np.argmax(out2.numpy, axis=1)
+    print(out2.numpy[0])
     acc = accuracy_score(train_Y, pre_lab)
     print(f"\033[32m[Epoch:{epoch}]\033[0m loss: {loss.numpy} accuracy: {acc}")
     losses.append(loss.numpy)
     acces.append(acc)
 
-plt.style.use("gadfly")
-plt.plot(losses, label="loss")
-plt.plot(acces,  label="acc")
-plt.legend()
-plt.show()
+# plt.style.use("gadfly")
+# plt.plot(losses, label="loss")
+# plt.plot(acces,  label="acc")
+# plt.legend()
+# plt.show()
 
-view_graph(format="pdf", direction="LR", show_grad=True)
+# view_graph(format="pdf", direction="LR", show_grad=True)

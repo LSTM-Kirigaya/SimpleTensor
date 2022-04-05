@@ -7,7 +7,7 @@ import numpy as np
 from SimpleTensor.util import Register
 from collections import defaultdict
 
-EPSILON = 0.00001
+EPSILON = 1e-8
 
 # constant variable
 class Clip:

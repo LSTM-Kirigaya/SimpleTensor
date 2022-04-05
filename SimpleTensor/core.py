@@ -85,6 +85,11 @@ class Operation(Node, abc.ABC):
 
 class Placeholder(Node): ...
 
+class Data(Node):
+    def __init__(self, data, node_name: str = ""):
+        super().__init__(node_name)
+        self.data = data
+
 class Variable(Node):
     def __init__(self, init_value : Union[np.ndarray, list] = None, node_name:str=""):
         super().__init__(node_name=node_name)
@@ -98,15 +103,31 @@ class Session(object):
             if isinstance(node, Variable):
                 node.data = np.array(node.data)
             elif isinstance(node, Placeholder):
-                try:
-                    node.data = np.array(feed_dict[node])
-                except:
-                    print(feed_dict.keys())
-                    exit(-1)
+                node.data = np.array(feed_dict[node])
+            elif isinstance(node, Data):
+                pass
             else:
                 input_datas = [n.data for n in node.input_nodes]
                 node.data = node.compute(*input_datas)
         return root_op
+    
+    def start_train(self, epoch : int, loss_nodes : List[Node], optimizer_name : str, optimizer_params : dict = None, batch_size:int = 128, callback=None):
+        # this is a easy way to train the network directly
+        # check and init 
+        from SimpleTensor.optimizer import optimizers
+        if optimizer_name not in optimizers:
+            print("{} is not a registered optimizer! All avialable optimizers: {}".format(
+                optimizer_name, list(optimizers.keys())
+            ))
+        if optimizer_params is not None:
+            optimizer = optimizers[optimizer_name](**optimizer_params)
+        else:
+            optimizer = optimizers[optimizer_name]()
+
+        for epo in range(epoch):
+            ...
+            
+
 
 class DnnOperator(abc.ABC):
     def __init__(self) -> None:

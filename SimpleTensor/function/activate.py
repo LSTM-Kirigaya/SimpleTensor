@@ -64,7 +64,7 @@ class elu(Operation):
 
 @runtime.activate_func("softmax")
 class softmax(Operation):
-    def __init__(self, x : Node, axis : int = None, node_name: str=""):
+    def __init__(self, x : Node, axis : int, node_name: str=""):
         super().__init__(input_nodes=[x], node_name=node_name)
         self.axis = axis
     

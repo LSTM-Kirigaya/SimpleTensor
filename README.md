@@ -27,7 +27,8 @@ Have fun!
 
 - [ ] support 2D conv
 - [ ] support RNN
-- [ ] resolve the unstable calcualtion problem
+- [x] different types of initialize methods
+- [ ] different types of optimizer
 - [x] reconstruct by ABC
 - [ ] reconstruct by C++/PyBind11
 - [ ] support JIT

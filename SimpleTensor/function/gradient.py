@@ -8,7 +8,7 @@ from SimpleTensor import Node, Operation
 import numpy as np
 
 # register module
-def __get_grad_by_shape(node : Node, grad : np.ndarray):
+def __get_grad_by_shape(node : np.ndarray, grad : np.ndarray):
         node_shape, grad_shape = node.shape, grad.shape
         if node_shape == grad_shape:
             return grad
@@ -19,8 +19,12 @@ def __get_grad_by_shape(node : Node, grad : np.ndarray):
             return grad.mean(axis=axis).reshape(node_shape)
 
 # TODO : In order to avoid necessary misunderstanding, please notice that averary of loss have been implemented by add
+# grad there must be a batch size of grad
+
 @runtime.gradient_func("add")
 def __add_gradient(op_node : Operation, grad : np.ndarray):
+    # TODO : write as batch
+    
     return [
         1. * __get_grad_by_shape(op_node.input_nodes[0].data, grad),
         1. * __get_grad_by_shape(op_node.input_nodes[1].data, grad)
@@ -108,4 +112,4 @@ def __elu_gradient(op_node : Operation, grad : np.ndarray):
 @runtime.gradient_func("softmax")
 def __softmax_gradient(op_node : Operation, grad : np.ndarray):
     f = op_node.data
-    return f * (1 - f)
+    return [f * (1 - f)]
