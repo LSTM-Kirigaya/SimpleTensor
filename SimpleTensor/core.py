@@ -85,6 +85,13 @@ class Operation(Node, abc.ABC):
 
 class Placeholder(Node): ...
 
+class Data(Node):
+    def __init__(self, data, node_name: str = ""):
+        super().__init__(node_name)
+        if not isinstance(data, np.ndarray):
+            raise TypeError("data must be a numpy array!")
+        self.data = data
+
 class Variable(Node):
     def __init__(self, init_value : Union[np.ndarray, list] = None, node_name:str=""):
         super().__init__(node_name=node_name)
@@ -98,11 +105,9 @@ class Session(object):
             if isinstance(node, Variable):
                 node.data = np.array(node.data)
             elif isinstance(node, Placeholder):
-                try:
-                    node.data = np.array(feed_dict[node])
-                except:
-                    print(feed_dict.keys())
-                    exit(-1)
+                node.data = np.array(feed_dict[node])
+            elif isinstance(node, Data):
+                pass
             else:
                 input_datas = [n.data for n in node.input_nodes]
                 node.data = node.compute(*input_datas)

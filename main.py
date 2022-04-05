@@ -27,13 +27,9 @@ X = st.Placeholder()
 Y = st.Placeholder()
 
 
-out1 = st.dnn.Linear(2, 2, act="sigmoid")(X)
-# out2 = Linear(8, 16, act="sigmoid")(out1)
-# out3 = Linear(16, 8)(out2)
-# out4 = Linear(8, 2, act="sigmoid")(out3)
+out = st.dnn.Linear(2, 2, act="sigmoid")(X)
 
-
-loss = st.measure.CrossEntropy(reduction="mean")(predict=out1, label=Y)
+loss = st.measure.CrossEntropy(reduction="mean")(predict=out, label=Y)
 session = st.Session()
 optimizer = st.optimizer.SGD(learning_rate=1e-2)
 
@@ -42,7 +38,7 @@ acces  = []
 for epoch in range(10):
     session.run(root_op=loss, feed_dict={X : train_X, Y : label})
     optimizer.minimize(loss)
-    pre_lab = np.argmax(out1.numpy, axis=1)
+    pre_lab = np.argmax(out.numpy, axis=1)
     acc = accuracy_score(train_Y, pre_lab)
     print(f"\033[32m[Epoch:{epoch}]\033[0m loss: {loss.numpy} accuracy: {acc}")
     losses.append(loss.numpy)
