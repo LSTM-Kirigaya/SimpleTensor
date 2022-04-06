@@ -20,3 +20,5 @@ print("X grad: ", grad_table[X])
 print("Y grad: ", grad_table[Y])
 print("Z grad: ", grad_table[Z])
 print("W grad: ", grad_table[W])
+
+st.view.view_graph(format="pdf", direction="LR", show_grad=True)
