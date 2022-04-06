@@ -1,38 +1,47 @@
-from graphviz import Digraph
 
-g = Digraph('G', filename='cluster.gv')
 
-# NOTE: the subgraph name needs to begin with 'cluster' (all lowercase)
-#       so that Graphviz recognizes it as a special cluster subgraph
+def dump_ans(array, length):
+    if len(array) < length:
+        return 0
+    ans = 0
+    depth = -1 * min(array)
+    for layer in range(depth):
+        cur_length = 0
+        for i in range(len(array)):
+            if array[i] >= (- layer):
+                ans += cur_length // length
+                cur_length = 0
+            else:
+                cur_length += 1
 
-with g.subgraph(name='cluster_0') as c:
-    c.attr(style='filled', color='lightgrey')
-    c.node('a0')
-    c.node('a1')
-    c.attr(label='process #1')
+        if cur_length > 0:
+            ans += cur_length // length
 
-with g.subgraph(name="cluster_0") as c:
-    c.attr(style='filled', color='lightgrey')
-    c.node('a2')
-    c.attr(label='process #1')
+    return ans
 
-with g.subgraph(name='cluster_1') as c:
-    c.attr(color='blue')
-    c.node_attr['style'] = 'filled'
-    c.node('b0')
-    c.node('b1')
-    c.node('b2')
-    c.attr(label='process #2')
+def func():
+    N = int(input())
+    _ = int(input())
+    arrays = input().split(',')
+    arrays = list(map(int, arrays))
+    if N > len(arrays):
+        print(0)
+        return
+    for i in range(len(arrays)):
+        arrays[i] = min(0, arrays[i])
+    ans = 0
+    buffer = []
+    for a in arrays:
+        if a == 0:
+            if len(buffer) > 0:
+                ans += dump_ans(buffer, N)
+                buffer = []
+        else:
+            buffer.append(a)
+    if len(buffer) > 0:
+        ans += dump_ans(buffer, N)
+    print(ans)
 
-g.edge('start', 'a0')
-g.edge('start', 'b0')
-g.edge('a1', 'b3')
-g.edge('b2', 'a3')
-g.edge('a3', 'a0')
-g.edge('a3', 'end')
-g.edge('b3', 'end')
 
-g.node('start', shape='Mdiamond')
-g.node('end', shape='Msquare')
-
-g.view()
+if __name__ == "__main__":
+    func()

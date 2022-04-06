@@ -41,6 +41,8 @@ def backwards(op_node : Operation):
                     visit_nodes.add(input_node)
                     queue.append(input_node)
 
+    # do average
+    
     return grad_table
 
 
@@ -76,7 +78,6 @@ class SGD(Optimizer):   # Stochastic gradient descent
         runtime.grad_table = grad_table
         return grad_table
 
-# TODO : More powerful optimizer
 # https://www.jianshu.com/p/aebcaf8af76e
 class Momentum(Optimizer):
     def __init__(self, learning_rate: float = 0.001, gamma=0.7):

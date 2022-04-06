@@ -21,6 +21,7 @@ def __get_grad_by_shape(node : Node, grad : np.ndarray):
 # TODO : In order to avoid necessary misunderstanding, please notice that averary of loss have been implemented by add
 @runtime.gradient_func("add")
 def __add_gradient(op_node : Operation, grad : np.ndarray):
+    
     return [
         1. * __get_grad_by_shape(op_node.input_nodes[0].data, grad),
         1. * __get_grad_by_shape(op_node.input_nodes[1].data, grad)
@@ -47,6 +48,7 @@ def __elementwise_pow_gradeint(op_node : Operation, grad : np.ndarray):
 def __matmul_gradient(op_node : Operation, grad : np.ndarray):
     x = op_node.input_nodes[0].data
     y = op_node.input_nodes[1].data
+
     return [grad @ y.T, x.T @ grad]
 
 @runtime.gradient_func("multiply")
@@ -57,14 +59,16 @@ def __multiply_gradient(op_node : Operation, grad : np.ndarray):
 
 @runtime.gradient_func("reduce_sum")
 def __reduce_sum_gradient(op_node : Operation, grad : np.ndarray):
-    return [1. * grad]
+    grad_shape = op_node.input_nodes[0].shape
+    return [1. * np.ones(grad_shape) * grad]
 
 @runtime.gradient_func("reduce_mean")
 def __reduce_mean_gradient(op_node : Operation, grad : np.ndarray):
     # multiplier = op_node.input_nodes[0].data.size / op_node.data.size
     # multiplier = op_node.input_nodes[0].shape[0]
     multiplier = 1
-    return [1. / multiplier * grad]
+    grad_shape = op_node.input_nodes[0].shape
+    return [1. * np.ones(grad_shape) / multiplier * grad]
 
 @runtime.gradient_func("log")
 def __log_gradient(op_node : Operation, grad : np.ndarray):
