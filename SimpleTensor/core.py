@@ -100,7 +100,7 @@ class Variable(Node):
 
 # create session to update nodes' data in the graph
 class Session(object):
-    def run(self, root_op : Operation, feed_dict : dict = {}):
+    def run(self, root_op : Operation, feed_dict : dict = {}, use_batch: bool = False):
         for node in runtime.global_calc_graph:
             if isinstance(node, Variable):
                 node.data = np.array(node.data)
@@ -108,10 +108,47 @@ class Session(object):
                 node.data = np.array(feed_dict[node])
             elif isinstance(node, Data):
                 pass
-            else:
+            elif isinstance(node, Operation):
+                # real forward is implemented here
                 input_datas = [n.data for n in node.input_nodes]
-                node.data = node.compute(*input_datas)
+                if use_batch:
+                    node.data.append(node.compute(*input_datas))
+                else:
+                    node.data = node.compute(*input_datas)
+            else:
+                raise TypeError("Unknown node type in global calcualtion graph: {}".format(type(node)))
         return root_op
+
+    def run_batch(self, root_op : Operation, feed_dict : dict = {}):
+        if len(feed_dict) == 0:
+            raise ValueError("feed_dict must contain something!")
+        flag = self.check_feed_dict(feed_dict)
+        if not flag:
+            raise ValueError("input placeholder must be the same!")
+        batch_size = -1
+        for k in feed_dict:
+            batch_size = len(feed_dict[k])
+            break
+        # init
+        for node in runtime.global_calc_graph:
+            if isinstance(node, Operation):
+                node.data = []
+        
+        # do loop
+        for i in range(batch_size):
+            one_batch = {k : feed_dict[k][i] for k in feed_dict}
+            self.run(root_op=root_op, feed_dict=one_batch)
+
+
+    def check_feed_dict(self, feed_dict : dict) -> bool:
+        batch_size = -1
+        for k in feed_dict:
+            if batch_size == -1:
+                batch_size = len(feed_dict[k])
+            elif batch_size != len(feed_dict[k]):
+                return False
+        return True
+
 
 class DnnOperator(abc.ABC):
     def __init__(self) -> None:

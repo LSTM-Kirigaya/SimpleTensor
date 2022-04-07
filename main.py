@@ -16,7 +16,7 @@ X = st.Placeholder()
 Y = st.Placeholder()
 out = st.dnn.Linear(2, 2, act="sigmoid")(X)
 
-loss = st.measure.CrossEntropy(reduction="mean")(predict=out, label=Y)
+loss = st.measure.CrossEntropy()(predict=out, label=Y)
 session = st.Session()
 optimizer = st.optimizer.SGD(learning_rate=5e-3)
 

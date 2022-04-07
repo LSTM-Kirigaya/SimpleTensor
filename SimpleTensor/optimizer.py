@@ -46,6 +46,8 @@ def backwards(op_node : Operation):
     return grad_table
 
 
+
+
 # optimizer
 class Optimizer(abc.ABC):
     def __init__(self, learning_rate : float = 1e-3):

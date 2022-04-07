@@ -1,7 +1,0 @@
-digraph {
-        1[label="A"]
-        2[label="B"]
-
-        123[label="A"]
-        1->2
-}
